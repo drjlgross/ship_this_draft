@@ -6,3 +6,9 @@ token-cache.json
 node_modules/
 shipped/
 token.json
+
+# macOS
+.DS_Store
+
+# raw screen-recording sources (GB-scale, one file exceeds GitHub's 100MB limit)
+demo_footage/*.mov
