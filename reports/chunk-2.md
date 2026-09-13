@@ -115,3 +115,49 @@ guarantee real, two things changed from my first draft:
 - Scope held: no sending, no Slack, no WordWright change, no retry logic, no
   token-refresh persistence beyond what googleapis does in-process, no
   multi-account handling.
+
+---
+
+## Addendum — per-channel output (fix applied after ratification)
+
+Commit `fc723ee`, "Per-channel output: each channel self-contained". `ship.js`
+only. This supersedes the "mail body read literally as two lines" deviation noted
+above, which is now moot.
+
+**Rationale.** The chunk-2 body stitched all three channels together: a ledger
+line, the GitHub URL and the Drive link in one mail. That makes each artifact
+depend on the others to be legible, and it is wrong in two directions. A reader
+who only gets the mail is handed links they may not be able to open, and the mail
+describes the draft instead of being it. A run where only one channel fires
+should still produce something correct and complete on its own. So each channel
+now carries what belongs to it natively, with no cross-references:
+
+- **Gmail** — the correspondence itself. Subject is the draft's first markdown
+  heading, or the slug humanized (dashes and underscores to spaces) when it has
+  none. Body is the draft's full text, plain, nothing above or below it. No
+  ledger, no GitHub URL, no Drive link. The `.docx` stays attached.
+- **GitHub** — unchanged. The ledger citation (slug, turn count, last-turn
+  timestamp) is git-native provenance and belongs in the commit message.
+- **Drive** — unchanged. Slug plus timestamp filename in the `ship_this_draft`
+  folder.
+
+**Content of the change.** Twelve lines in `ship.js`: a `marked` import, a
+four-line `emailSubject(draft, slug)` helper, and the two changed properties in
+the `createGmailDraft` call. Nothing in `google-ship.js`, `google-client.js`,
+fetching, conversion, scopes, or the Drive/GitHub paths moved.
+
+**Verified** on draft `r7876213886672915177`: subject `demo doc` (this draft has
+no heading, so the slug branch ran); body string-compares exactly equal to a fresh
+WordWright fetch of `draft`; ledger line, `github.com` and `docs.google.com` all
+confirmed absent from the body; attachment present; label `DRAFT` only. The
+heading branch was unit-tested separately (`# Quarterly Update` -> `Quarterly
+Update`, including a heading that follows an opening paragraph). GitHub commit
+`39e401bc` still carries the full ledger line, and Drive reused folder
+`1Wjwn...41DEQ` rather than creating a duplicate.
+
+**Known gap, not addressed.** Subjects now come from draft content rather than a
+fixed ASCII string, and `buildMime` writes the subject header raw with no
+RFC 2047 encoding. A heading containing an em-dash, curly quote or accent will go
+out mis-encoded. The demo draft is pure ASCII so it did not bite. The fix belongs
+in `buildMime` in `google-ship.js`, which this task explicitly placed out of
+bounds, so it was flagged rather than made.
