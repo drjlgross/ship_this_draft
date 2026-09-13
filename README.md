@@ -12,11 +12,11 @@ Built on **Sunday, September 13, 2026** for the Lemma / Comma Capital Multi-App
 AI Agent Hackathon. Every commit in this repo is from that day; the agent's own
 test runs are visible in the history as `Ship <slug>: N turns...` commits.
 
-**Demo (3 min 24 s):**
+**Demo (3 min 24 s)** — click the still to play the walkthrough:
 
-<video src="https://github.com/drjlgross/ship_this_draft/raw/main/demo_footage/demo-master-full.mp4" controls playsinline width="100%"></video>
+[![ship_this_draft demo walkthrough](demo_footage/demo-poster.png)](https://github.com/drjlgross/ship_this_draft/raw/main/demo_footage/demo-master-full.mp4)
 
-If the player above doesn't load, [download the demo](demo_footage/demo-master-full.mp4) (MP4, 30 MB).
+<sub>MP4, 30 MB, committed at `demo_footage/demo-master-full.mp4`.</sub>
 
 ## What it connects to (5 external apps)
 
