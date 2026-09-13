@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { markdownToDocx } from './md-to-docx.js';
+import { authorizedClient } from './google-client.js';
+import { uploadToDrive, createGmailDraft } from './google-ship.js';
 
 const WW_BASE = 'https://wordwright.ink';
 
@@ -68,6 +70,16 @@ async function main() {
   const ghToken = env('GITHUB_TOKEN');
   const repo = env('GITHUB_REPO');
   const slug = process.argv[2] ?? env('WORDWRIGHT_SLUG');
+  const notify = env('SHIP_NOTIFY_EMAIL');
+
+  // Preflight the Google credentials before any side effect, so a missing
+  // token.json fails loud instead of half-shipping.
+  let auth;
+  try {
+    auth = authorizedClient();
+  } catch (e) {
+    die(e.message);
+  }
 
   const doc = await fetchDocument(wwToken, slug);
   const { draft, turnCount, lastAt } = readLedger(doc);
@@ -78,12 +90,31 @@ async function main() {
   mkdirSync('shipped', { recursive: true });
   writeFileSync(join('shipped', filename), buffer);
 
-  const message = `Ship ${slug}: ${turnCount} turns, last turn ${lastAt}`;
-  const url = await commitToGitHub({
-    repo, token: ghToken, path: `shipped/${filename}`, buffer, message,
+  const ledger = `Ship ${slug}: ${turnCount} turns, last turn ${lastAt}`;
+  const githubUrl = await commitToGitHub({
+    repo, token: ghToken, path: `shipped/${filename}`, buffer, message: ledger,
   });
 
-  console.log(url);
+  // GitHub is shipped from here on. Anything that fails below must still
+  // surface the GitHub URL before dying, so the run is never silently lost.
+  let driveLink;
+  try {
+    driveLink = await uploadToDrive(auth, { filename, buffer });
+    const draftId = await createGmailDraft(auth, {
+      to: notify,
+      subject: `Shipped: ${slug}`,
+      body: `${ledger}\n${githubUrl} ${driveLink}`,
+      filename,
+      buffer,
+    });
+    console.log(githubUrl);
+    console.log(driveLink);
+    console.log(draftId);
+  } catch (e) {
+    console.log(githubUrl);
+    if (driveLink) console.log(driveLink);
+    die(`Google step failed after GitHub commit succeeded: ${e.message}`);
+  }
 }
 
 main();

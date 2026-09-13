@@ -20,6 +20,7 @@
   "homepage": "https://github.com/drjlgross/ship_this_draft#readme",
   "dependencies": {
     "docx": "^9.7.1",
+    "googleapis": "^180.0.0",
     "marked": "^18.0.13"
   }
 }
