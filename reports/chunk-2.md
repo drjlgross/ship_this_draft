@@ -161,3 +161,57 @@ RFC 2047 encoding. A heading containing an em-dash, curly quote or accent will g
 out mis-encoded. The demo draft is pure ASCII so it did not bite. The fix belongs
 in `buildMime` in `google-ship.js`, which this task explicitly placed out of
 bounds, so it was flagged rather than made.
+
+---
+
+## Addendum 2 — email recipient seam (2026-09-13)
+
+Commit "Email: no attachment; recipient seam with notify-email default".
+`ship.js` and `google-ship.js`, email assembly only.
+
+**What changed.**
+
+1. **No attachment on Gmail drafts.** `buildMime` no longer builds a
+   `multipart/mixed` message with a base64 `.docx` part. A draft is now a single
+   `text/plain; charset="UTF-8"` message: To, Subject, body. The Drive upload
+   still uses `DOCX_MIME`; nothing in the artifact channels changed.
+2. **Recipient seam.** `createGmailDraft(auth, { recipients, subject, body })`
+   takes `recipients` as an array of one or more addresses, joined into the `To:`
+   header. Unprovided, it falls back to `[SHIP_NOTIFY_EMAIL]` from `.env`, which
+   is the existing behavior. It throws on a non-array, an empty array, or any
+   empty address, rather than creating a draft addressed to nobody. `ship.js`
+   passes no `recipients` and so takes the default; it still preflights
+   `SHIP_NOTIFY_EMAIL` up front so a missing address fails loud before anything
+   ships. Subject is untouched: first heading, else humanized slug.
+
+**Why.** These are two halves of the same idea — that a channel should carry what
+it is actually for.
+
+Email is the *correspondence* channel. Its deliverable is the letter itself, which
+is already the body text. A `.docx` of that same letter stapled to it is exhaust:
+it duplicates the body in a form the recipient has to download to read, and it
+makes a piece of correspondence look like a file-transfer notification. GitHub and
+Drive remain the *artifact* channels, and both still receive the `.docx` exactly
+as before — removing the attachment loses nothing, because the artifact still
+exists in the two places whose job is to hold it.
+
+The recipient seam exists so the upcoming review-pass chunk can pass user-supplied
+addresses through without reopening this code. It is deliberately only a seam: a
+parameter and a validation, with no prompting, model calls, or routing logic
+behind it. Addressing correspondence is the consequential step in this pipeline —
+it decides who hears from you — so it stays a human greenlight decision, and the
+default remains the operator's own address. The plumbing is in place before any
+caller is trusted to use it.
+
+**Verified** on draft `r-936414859929666273` (run of 2026-09-13 15:43):
+`payload.mimeType` is `text/plain` with no `parts`, no `attachmentId`, and no
+`.docx` anywhere in the payload; `To:` equals `SHIP_NOTIFY_EMAIL`; subject is
+`demo doc`, the humanized-slug branch, unchanged in format; body string-compares
+exactly equal to a fresh WordWright fetch of `draft`; label is `DRAFT` only. The
+guard was exercised separately on `[]`, `['a@x.com', '']` and a non-array, all of
+which throw before any API call. Artifact channels confirmed unaffected: GitHub
+`shipped/demo-doc-20260913-1543.docx` (8851 bytes) with the ledger commit message
+intact, and the same-named file in the reused Drive folder `1Wjwn...41DEQ`.
+
+**Still open** from addendum 1: subject headers are written without RFC 2047
+encoding, so a non-ASCII heading will go out mis-encoded. Unchanged by this task.

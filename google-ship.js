@@ -34,33 +34,27 @@ export async function uploadToDrive(auth, { filename, buffer }) {
   return data.webViewLink;
 }
 
-function buildMime({ to, subject, body, filename, buffer }) {
-  const boundary = `ship_${Date.now().toString(36)}`;
-  const b64 = buffer.toString('base64').replace(/(.{76})/g, '$1\r\n');
+function buildMime({ recipients, subject, body }) {
   return [
-    `To: ${to}`,
+    `To: ${recipients.join(', ')}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     '',
     body,
-    `--${boundary}`,
-    `Content-Type: ${DOCX_MIME}; name="${filename}"`,
-    `Content-Disposition: attachment; filename="${filename}"`,
-    'Content-Transfer-Encoding: base64',
-    '',
-    b64,
-    `--${boundary}--`,
     '',
   ].join('\r\n');
 }
 
-export async function createGmailDraft(auth, opts) {
+// `recipients` is the seam a later caller uses to address correspondence.
+// Unprovided, it falls back to the single notify address from .env.
+export async function createGmailDraft(auth, { recipients, subject, body }) {
+  const to = recipients ?? [process.env.SHIP_NOTIFY_EMAIL];
+  if (!Array.isArray(to) || to.length === 0 || to.some((r) => !r)) {
+    throw new Error('Gmail draft: recipients must be a non-empty array of addresses');
+  }
   const gmail = google.gmail({ version: 'v1', auth });
-  const raw = Buffer.from(buildMime(opts)).toString('base64url');
+  const raw = Buffer.from(buildMime({ recipients: to, subject, body })).toString('base64url');
   const { data } = await gmail.users.drafts.create({ userId: 'me', requestBody: { message: { raw } } });
   if (!data.id) throw new Error('Gmail drafts.create returned no draft id');
   return data.id;

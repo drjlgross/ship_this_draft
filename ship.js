@@ -78,7 +78,9 @@ async function main() {
   const ghToken = env('GITHUB_TOKEN');
   const repo = env('GITHUB_REPO');
   const slug = process.argv[2] ?? env('WORDWRIGHT_SLUG');
-  const notify = env('SHIP_NOTIFY_EMAIL');
+  // Preflighted so a missing address fails loud before anything ships;
+  // createGmailDraft reads it as the default recipient.
+  env('SHIP_NOTIFY_EMAIL');
 
   // Preflight the Google credentials before any side effect, so a missing
   // token.json fails loud instead of half-shipping.
@@ -109,11 +111,8 @@ async function main() {
   try {
     driveLink = await uploadToDrive(auth, { filename, buffer });
     const draftId = await createGmailDraft(auth, {
-      to: notify,
       subject: emailSubject(draft, slug),
       body: draft,
-      filename,
-      buffer,
     });
     console.log(githubUrl);
     console.log(driveLink);
