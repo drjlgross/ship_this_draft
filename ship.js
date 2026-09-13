@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { marked } from 'marked';
 import { markdownToDocx } from './md-to-docx.js';
 import { authorizedClient } from './google-client.js';
 import { uploadToDrive, createGmailDraft } from './google-ship.js';
@@ -45,6 +46,13 @@ function readLedger(doc) {
     die('WordWright document: last history turn has no `timestamp`');
   }
   return { draft: doc.draft, turnCount: doc.history.length, lastAt: last.timestamp };
+}
+
+// The draft is the correspondence, so the mail carries the draft itself: its
+// first heading as the subject, or the humanized slug when it has none.
+function emailSubject(draft, slug) {
+  const heading = marked.lexer(draft).find((t) => t.type === 'heading');
+  return heading ? heading.text : slug.replace(/[-_]+/g, ' ');
 }
 
 async function commitToGitHub({ repo, token, path, buffer, message }) {
@@ -102,8 +110,8 @@ async function main() {
     driveLink = await uploadToDrive(auth, { filename, buffer });
     const draftId = await createGmailDraft(auth, {
       to: notify,
-      subject: `Shipped: ${slug}`,
-      body: `${ledger}\n${githubUrl} ${driveLink}`,
+      subject: emailSubject(draft, slug),
+      body: draft,
       filename,
       buffer,
     });
